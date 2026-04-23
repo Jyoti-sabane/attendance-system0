@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assign Teachers to Subjects - Admin Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/admin/dashboard" class="navbar-brand">Attendance System - Admin</a>
+        <ul class="navbar-nav">
+            <li><a href="/admin/dashboard">Dashboard</a></li>
+            <li><a href="/admin/manage_students">Manage Students</a></li>
+            <li><a href="/admin/assign_staff_subjects">Assign Teachers</a></li>
+            <li><a href="/admin/view_attendance">View Attendance</a></li>
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </nav>
+    
+    <div class="container">
+        <h1>Assign Teachers to Subjects</h1>
+        
+        <div id="message"></div>
+        
+        <div class="card">
+            <h2>New Assignment</h2>
+            <form id="assignForm">
+                <div class="form-group">
+                    <label for="staff_id">Select Teacher</label>
+                    <select class="form-control" id="staff_id" name="staff_id" required>
+                        <option value="">Choose a teacher...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="subject_id">Select Subject</label>
+                    <select class="form-control" id="subject_id" name="subject_id" required>
+                        <option value="">Choose a subject...</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Assign Teacher to Subject</button>
+            </form>
+        </div>
+        
+        <div class="card">
+            <h2>Current Assignments</h2>
+            <div class="table-container">
+                <table id="assignmentsTable">
+                    <thead>
+                        <tr>
+                            <th>Teacher Name</th>
+                            <th>Username</th>
+                            <th>Subject Code</th>
+                            <th>Subject Name</th>
+                            <th>Assigned Date</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="assignmentsBody">
+                        <tr><td colspan="6" style="text-align: center;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/js/main.js"></script>
+    <script>
+        async function loadStaff() {
+            const response = await fetch('/admin/api/staff');
+            const staff = await response.json();
+            const select = document.getElementById('staff_id');
+            staff.forEach(s => {
+                const option = document.createElement('option');
+                option.value = s._id;
+                option.textContent = `${s.full_name} (${s.username})`;
+                select.appendChild(option);
+            });
+        }
+        
+        async function loadSubjects() {
+            const response = await fetch('/admin/api/subjects');
+            const subjects = await response.json();
+            const select = document.getElementById('subject_id');
+            subjects.forEach(s => {
+                const option = document.createElement('option');
+                option.value = s._id;
+                option.textContent = `${s.subject_code} - ${s.subject_name}`;
+                select.appendChild(option);
+            });
+        }
+        
+        async function loadAssignments() {
+            const response = await fetch('/admin/api/assignments');
+            const assignments = await response.json();
+            const tbody = document.getElementById('assignmentsBody');
+            
+            if (assignments.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No assignments found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = assignments.map(a => `
+                <tr>
+                    <td>${escapeHtml(a.staff_id.full_name)}</td>
+                    <td>${escapeHtml(a.staff_id.username)}</td>
+                    <td>${escapeHtml(a.subject_id.subject_code)}</td>
+                    <td>${escapeHtml(a.subject_id.subject_name)}</td>
+                    <td>${new Date(a.assigned_at).toLocaleDateString()}</td>
+                    <td>
+                        <button onclick="removeAssignment('${a._id}')" class="btn btn-danger" style="padding: 5px 10px;">Remove</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        async function removeAssignment(id) {
+            if (!confirm('Remove this assignment?')) return;
+            
+            const response = await fetch(`/admin/api/assignments/${id}`, { method: 'DELETE' });
+            const result = await response.json();
+            
+            if (result.success) {
+                showNotification(result.message, 'success');
+                loadAssignments();
+            } else {
+                showNotification(result.error, 'danger');
+            }
+        }
+        
+        document.getElementById('assignForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            
+            const response = await fetch('/admin/api/assign-staff', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showNotification(result.message, 'success');
+                loadAssignments();
+                e.target.reset();
+            } else {
+                document.getElementById('message').innerHTML = `<div class="alert alert-danger">${result.error}</div>`;
+                setTimeout(() => document.getElementById('message').innerHTML = '', 3000);
+            }
+        });
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        loadStaff();
+        loadSubjects();
+        loadAssignments();
+    </script>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Attendance - Staff Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .percentage-high { color: #28a745; font-weight: bold; }
+        .percentage-medium { color: #ff9800; font-weight: bold; }
+        .percentage-low { color: #dc3545; font-weight: bold; }
+        .info-box { background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #2196f3; }
+        .attendance-table { width: 100%; border-collapse: collapse; }
+        .attendance-table th, .attendance-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        .attendance-table th { background-color: #4CAF50; color: white; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/staff/dashboard" class="navbar-brand">Attendance System - Staff</a>
+        <ul class="navbar-nav">
+            <li><a href="/staff/dashboard">Dashboard</a></li>
+            <li><a href="/staff/assign_students">Assign Students</a></li>
+            <li><a href="/staff/mark_attendance">Mark Attendance</a></li>
+            <li><a href="/staff/view_attendance">View Attendance</a></li>
+            <li><a href="/logout" onclick="return confirm('Are you sure you want to logout?')">Logout</a></li>
+        </ul>
+    </nav>
+    
+    <div class="container">
+        <h1>View Attendance Records</h1>
+        
+        <div class="card">
+            <form id="filterForm">
+                <div class="form-group">
+                    <label for="subject_id">Select Subject</label>
+                    <select class="form-control" id="subject_id" name="subject_id" required>
+                        <option value="">Select a subject</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="month">Month</label>
+                    <select class="form-control" id="month" name="month">
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="year">Year</label>
+                    <select class="form-control" id="year" name="year"></select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">View Report</button>
+            </form>
+        </div>
+        
+        <div id="reportContainer" style="display: none;">
+            <div class="info-box" id="infoBox"></div>
+            <div class="table-container">
+                <table class="attendance-table">
+                    <thead>
+                        <tr>
+                            <th>Roll Number</th>
+                            <th>Student Name</th>
+                            <th>Present</th>
+                            <th>Absent</th>
+                            <th>Total Lectures</th>
+                            <th>Attendance Percentage</th>
+                        </thead>
+                    <tbody id="reportBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/js/main.js"></script>
+    <script>
+        const currentYear = new Date().getFullYear();
+        const yearSelect = document.getElementById('year');
+        for (let y = currentYear - 2; y <= currentYear + 1; y++) {
+            const option = document.createElement('option');
+            option.value = y;
+            option.textContent = y;
+            if (y === currentYear) option.selected = true;
+            yearSelect.appendChild(option);
+        }
+        
+        document.getElementById('month').value = new Date().getMonth() + 1;
+        
+        async function loadSubjects() {
+            try {
+                const response = await fetch('/staff/api/subjects');
+                const subjects = await response.json();
+                const select = document.getElementById('subject_id');
+                subjects.forEach(s => {
+                    const option = document.createElement('option');
+                    option.value = s.subject_id;
+                    option.textContent = `${s.subject_code} - ${s.subject_name}`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading subjects:', error);
+            }
+        }
+        
+        document.getElementById('filterForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const subject_id = document.getElementById('subject_id').value;
+            const month = document.getElementById('month').value;
+            const year = document.getElementById('year').value;
+            
+            if (!subject_id) {
+                alert('Please select a subject');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/staff/api/attendance-report?subject_id=${subject_id}&month=${month}&year=${year}`);
+                const data = await response.json();
+                
+                const container = document.getElementById('reportContainer');
+                const infoBox = document.getElementById('infoBox');
+                const tbody = document.getElementById('reportBody');
+                
+                infoBox.innerHTML = `
+                    <strong>📊 Attendance Summary for ${getMonthName(month)} ${year}</strong><br>
+                    Total Lectures Conducted: <strong>${data.total_lectures}</strong><br>
+                    Total Students Enrolled: <strong>${data.report.length}</strong><br>
+                    <small>Note: Percentage = (Present / Total Lectures) × 100</small>
+                `;
+                
+                if (data.report.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No attendance records found</td></tr>';
+                } else {
+                    tbody.innerHTML = data.report.map(s => {
+                        let percentageClass = 'percentage-low';
+                        if (s.percentage >= 75) percentageClass = 'percentage-high';
+                        else if (s.percentage >= 60) percentageClass = 'percentage-medium';
+                        
+                        const absent = s.total_days - s.total_present;
+                        
+                        return `
+                            <tr>
+                                <td>${escapeHtml(s.roll_number)}</td>
+                                <td>${escapeHtml(s.student_name)}</td>
+                                <td style="color: green; font-weight: bold;">${s.total_present}</td>
+                                <td style="color: red; font-weight: bold;">${absent}</td>
+                                <td>${s.total_days}</td>
+                                <td class="${percentageClass}">${s.percentage}%</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+                
+                container.style.display = 'block';
+            } catch (error) {
+                console.error('Error loading report:', error);
+                alert('Error loading attendance report');
+            }
+        });
+        
+        function getMonthName(month) {
+            const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                            'July', 'August', 'September', 'October', 'November', 'December'];
+            return months[parseInt(month) - 1];
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        loadSubjects();
+    </script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Student - Admin Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/admin/dashboard" class="navbar-brand">Attendance System - Admin</a>
+        <ul class="navbar-nav">
+            <li><a href="/admin/dashboard">Dashboard</a></li>
+            <li><a href="/admin/manage_students">Manage Students</a></li>
+            <li><a href="/admin/assign_staff_subjects">Assign Teachers</a></li>
+            <li><a href="/admin/view_attendance">View Attendance</a></li>
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </nav>
+    
+    <div class="container">
+        <div class="card" style="max-width: 600px; margin: 0 auto;">
+            <h2>Edit Student</h2>
+            
+            <div id="message"></div>
+            
+            <form id="editStudentForm">
+                <div class="form-group">
+                    <label for="roll_number">Roll Number</label>
+                    <input type="text" class="form-control" id="roll_number" name="roll_number" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="student_name">Student Name</label>
+                    <input type="text" class="form-control" id="student_name" name="student_name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" class="form-control" id="email" name="email">
+                </div>
+                
+                <div class="form-group">
+                    <label for="branch">Branch</label>
+                    <input type="text" class="form-control" id="branch" name="branch">
+                </div>
+                
+                <div class="form-group">
+                    <label for="year">Year</label>
+                    <select class="form-control" id="year" name="year">
+                        <option value="1">1st Year</option>
+                        <option value="2">2nd Year</option>
+                        <option value="3">3rd Year</option>
+                        <option value="4">4th Year</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Update Student</button>
+                <a href="/admin/manage_students" class="btn btn-danger">Cancel</a>
+            </form>
+        </div>
+    </div>
+    
+    <script src="/js/main.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const studentId = urlParams.get('id');
+        
+        async function loadStudent() {
+            try {
+                const response = await fetch(`/admin/api/students/${studentId}`);
+                const student = await response.json();
+                
+                document.getElementById('roll_number').value = student.roll_number;
+                document.getElementById('student_name').value = student.student_name;
+                document.getElementById('email').value = student.email || '';
+                document.getElementById('branch').value = student.branch || '';
+                document.getElementById('year').value = student.year;
+            } catch (error) {
+                showNotification('Error loading student', 'danger');
+            }
+        }
+        
+        document.getElementById('editStudentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            
+            const response = await fetch(`/admin/api/students/${studentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showNotification(result.message, 'success');
+                setTimeout(() => {
+                    window.location.href = '/admin/manage_students';
+                }, 1000);
+            } else {
+                document.getElementById('message').innerHTML = `<div class="alert alert-danger">${result.error}</div>`;
+            }
+        });
+        
+        loadStudent();
+    </script>
+</body>
+</html>

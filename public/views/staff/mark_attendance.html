@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mark Attendance - Staff Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .status-present { color: #28a745; font-weight: bold; }
+        .status-absent { color: #dc3545; font-weight: bold; }
+        .lecture-info { background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .attendance-table { width: 100%; border-collapse: collapse; }
+        .attendance-table th, .attendance-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        .attendance-table th { background-color: #4CAF50; color: white; }
+        .radio-group { display: flex; gap: 20px; }
+        .radio-group label { cursor: pointer; margin-right: 15px; }
+        .btn-save { margin-top: 20px; padding: 10px 30px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/staff/dashboard" class="navbar-brand">Attendance System - Staff</a>
+        <ul class="navbar-nav">
+            <li><a href="/staff/dashboard">Dashboard</a></li>
+            <li><a href="/staff/assign_students">Assign Students</a></li>
+            <li><a href="/staff/mark_attendance">Mark Attendance</a></li>
+            <li><a href="/staff/view_attendance">View Attendance</a></li>
+            <li><a href="/logout" onclick="return confirm('Are you sure you want to logout?')">Logout</a></li>
+        </ul>
+    </nav>
+    
+    <div class="container">
+        <div class="card">
+            <h2>Mark Attendance</h2>
+            
+            <div id="message"></div>
+            
+            <form id="attendanceForm">
+                <div class="form-group">
+                    <label for="subject_id">Select Subject *</label>
+                    <select class="form-control" id="subject_id" name="subject_id" required>
+                        <option value="">Select a subject</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="attendance_date">Date *</label>
+                    <input type="date" class="form-control" id="attendance_date" name="attendance_date" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="lecture_number">Lecture Number *</label>
+                    <input type="number" class="form-control" id="lecture_number" name="lecture_number" min="1" max="10" required>
+                    <small>Enter lecture number (1-10) for this class</small>
+                </div>
+                
+                <div id="studentsAttendance" style="display: none;">
+                    <div class="lecture-info">
+                        <strong>📋 Attendance Sheet</strong><br>
+                        Mark Present or Absent for each student
+                    </div>
+                    <div class="table-container">
+                        <table class="attendance-table">
+                            <thead>
+                                <tr>
+                                    <th>Roll Number</th>
+                                    <th>Student Name</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendanceTableBody"></tbody>
+                        </table>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-save">Save Attendance</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script src="/js/main.js"></script>
+    <script>
+        // Set default date to today
+        document.getElementById('attendance_date').value = new Date().toISOString().split('T')[0];
+        
+        let currentStudents = [];
+        
+        async function loadSubjects() {
+            try {
+                const response = await fetch('/staff/api/subjects');
+                const subjects = await response.json();
+                const select = document.getElementById('subject_id');
+                subjects.forEach(s => {
+                    const option = document.createElement('option');
+                    option.value = s.subject_id;
+                    option.textContent = `${s.subject_code} - ${s.subject_name}`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading subjects:', error);
+            }
+        }
+        
+        document.getElementById('subject_id').addEventListener('change', async () => {
+            const subjectId = document.getElementById('subject_id').value;
+            if (!subjectId) {
+                document.getElementById('studentsAttendance').style.display = 'none';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/staff/api/subjects/${subjectId}/students`);
+                currentStudents = await response.json();
+                
+                const container = document.getElementById('studentsAttendance');
+                const tbody = document.getElementById('attendanceTableBody');
+                
+                if (currentStudents.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: red;">No students assigned to this subject. Please assign students first.</td></tr>';
+                } else {
+                    tbody.innerHTML = currentStudents.map(s => `
+                        <tr>
+                            <td>${escapeHtml(s.roll_number)}</td>
+                            <td>${escapeHtml(s.student_name)}</td>
+                            <td>
+                                <div class="radio-group">
+                                    <label>
+                                        <input type="radio" name="attendance[${s._id}]" value="present" ${s.current_status === 'present' ? 'checked' : ''} required>
+                                        <span class="status-present">✓ Present</span>
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="attendance[${s._id}]" value="absent" ${s.current_status === 'absent' ? 'checked' : ''}>
+                                        <span class="status-absent">✗ Absent</span>
+                                    </label>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+                container.style.display = 'block';
+            } catch (error) {
+                console.error('Error loading students:', error);
+                showNotification('Error loading students', 'danger');
+            }
+        });
+        
+        document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const subject_id = document.getElementById('subject_id').value;
+            const attendance_date = document.getElementById('attendance_date').value;
+            const lecture_number = document.getElementById('lecture_number').value;
+            
+            if (!subject_id) {
+                showNotification('Please select a subject', 'danger');
+                return;
+            }
+            
+            if (!attendance_date) {
+                showNotification('Please select a date', 'danger');
+                return;
+            }
+            
+            if (!lecture_number) {
+                showNotification('Please enter lecture number', 'danger');
+                return;
+            }
+            
+            // Collect attendance data
+            const formData = new FormData(e.target);
+            const attendance = {};
+            for (let [key, value] of formData.entries()) {
+                if (key.startsWith('attendance[')) {
+                    const studentId = key.match(/\[(.*?)\]/)[1];
+                    attendance[studentId] = value;
+                }
+            }
+            
+            // Check if all students have been marked
+            if (Object.keys(attendance).length !== currentStudents.length) {
+                showNotification(`Please mark attendance for all ${currentStudents.length} students`, 'danger');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/staff/api/attendance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subject_id, attendance_date, lecture_number, attendance })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification(result.message, 'success');
+                    // Reload students to show updated status
+                    document.getElementById('subject_id').dispatchEvent(new Event('change'));
+                    // Clear message after 3 seconds
+                    setTimeout(() => {
+                        document.getElementById('message').innerHTML = '';
+                    }, 3000);
+                } else {
+                    showNotification(result.error, 'danger');
+                }
+            } catch (error) {
+                console.error('Error saving attendance:', error);
+                showNotification('Error saving attendance', 'danger');
+            }
+        });
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function showNotification(message, type) {
+            const msgDiv = document.getElementById('message');
+            msgDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => {
+                msgDiv.innerHTML = '';
+            }, 3000);
+        }
+        
+        loadSubjects();
+    </script>
+</body>
+</html>

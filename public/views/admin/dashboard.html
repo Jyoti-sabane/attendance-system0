@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Attendance Management System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/admin/dashboard" class="navbar-brand">Attendance System - Admin</a>
+        <ul class="navbar-nav">
+            <li><a href="/admin/dashboard">Dashboard</a></li>
+            <li><a href="/admin/manage_students">Manage Students</a></li>
+            <li><a href="/admin/assign_staff_subjects">Assign Teachers</a></li>
+            <li><a href="/admin/view_attendance">View Attendance</a></li>
+            <li><a href="/logout" onclick="return confirm('Are you sure you want to logout?')">Logout</a></li>
+        </ul>
+    </nav>
+    
+    <div class="container">
+        <h1 id="welcomeMsg"></h1>
+        
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-number" id="studentCount">-</div>
+                <div class="stat-label">Total Students</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="staffCount">-</div>
+                <div class="stat-label">Total Staff</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="subjectCount">-</div>
+                <div class="stat-label">Total Subjects</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="attendanceCount">-</div>
+                <div class="stat-label">Attendance Records</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>Quick Actions</h3>
+            <div style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+                <a href="/admin/manage_students" class="btn btn-primary">Manage Students</a>
+                <a href="/admin/assign_staff_subjects" class="btn btn-primary">Assign Teachers to Subjects</a>
+                <a href="/admin/view_attendance" class="btn btn-success">View Attendance</a>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/js/main.js"></script>
+    <script>
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/admin/api/stats');
+                const data = await response.json();
+                
+                document.getElementById('studentCount').textContent = data.student_count;
+                document.getElementById('staffCount').textContent = data.staff_count;
+                document.getElementById('subjectCount').textContent = data.subject_count;
+                document.getElementById('attendanceCount').textContent = data.attendance_count;
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+        
+        async function getUserInfo() {
+            try {
+                const response = await fetch('/api/check-session');
+                const data = await response.json();
+                if (data.authenticated) {
+                    document.getElementById('welcomeMsg').innerHTML = `Welcome, ${data.user.full_name}!`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        loadDashboard();
+        getUserInfo();
+        
+        setTimeout(function() {
+            alert('Your session will expire in 2 minutes due to inactivity.');
+        }, 1680000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Attendance - Admin Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/admin/dashboard" class="navbar-brand">Attendance System - Admin</a>
+        <ul class="navbar-nav">
+            <li><a href="/admin/dashboard">Dashboard</a></li>
+            <li><a href="/admin/manage_students">Manage Students</a></li>
+            <li><a href="/admin/assign_staff_subjects">Assign Teachers</a></li>
+            <li><a href="/admin/view_attendance">View Attendance</a></li>
+            <li><a href="/logout" onclick="return confirm('Are you sure you want to logout?')">Logout</a></li>
+        </ul>
+    </nav>
+    
+    <div class="container">
+        <h1>Attendance Records</h1>
+        
+        <div class="card">
+            <form id="filterForm" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                <div class="form-group">
+                    <label for="month">Month</label>
+                    <select class="form-control" id="month" name="month">
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="year">Year</label>
+                    <select class="form-control" id="year" name="year"></select>
+                </div>
+                
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Filter</button>
+                </div>
+            </form>
+        </div>
+        
+        <div class="table-container">
+            <table id="attendanceTable">
+                <thead>
+                    <tr>
+                        <th>Roll Number</th>
+                        <th>Student Name</th>
+                        <th>Branch</th>
+                        <th>Year</th>
+                        <th>Total Present</th>
+                        <th>Total Days</th>
+                        <th>Attendance Percentage</th>
+                    </tr>
+                </thead>
+                <tbody id="attendanceBody">
+                    <tr><td colspan="7" style="text-align: center;">Select month and year to view</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <button id="exportExcelBtn" class="btn btn-success">📊 Download Excel Report</button>
+            <button id="exportCSVBtn" class="btn btn-primary">📥 Download CSV Report</button>
+        </div>
+    </div>
+    
+    <script src="/js/main.js"></script>
+    <script>
+        const currentYear = new Date().getFullYear();
+        const yearSelect = document.getElementById('year');
+        for (let y = currentYear - 2; y <= currentYear + 1; y++) {
+            const option = document.createElement('option');
+            option.value = y;
+            option.textContent = y;
+            if (y === currentYear) option.selected = true;
+            yearSelect.appendChild(option);
+        }
+        
+        document.getElementById('month').value = new Date().getMonth() + 1;
+        
+        async function loadAttendance(month, year) {
+            try {
+                const response = await fetch(`/admin/api/attendance?month=${month}&year=${year}`);
+                const data = await response.json();
+                
+                const tbody = document.getElementById('attendanceBody');
+                if (data.students.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No attendance records found</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = data.students.map(student => {
+                    let percentageClass = 'percentage-low';
+                    if (student.percentage >= 75) percentageClass = 'percentage-high';
+                    else if (student.percentage >= 60) percentageClass = 'percentage-medium';
+                    
+                    return `
+                        <tr>
+                            <td>${escapeHtml(student.roll_number)}</td>
+                            <td>${escapeHtml(student.student_name)}</td>
+                            <td>${escapeHtml(student.branch || '-')}</td>
+                            <td>${student.year}</td>
+                            <td>${student.total_attendance}</td>
+                            <td>${student.total_days}</td>
+                            <td class="${percentageClass}">${student.percentage}%</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('attendanceBody').innerHTML = '<tr><td colspan="7" style="text-align: center;">Error loading data</td></tr>';
+            }
+        }
+        
+        document.getElementById('filterForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const month = document.getElementById('month').value;
+            const year = document.getElementById('year').value;
+            loadAttendance(month, year);
+        });
+        
+        document.getElementById('exportExcelBtn').addEventListener('click', () => {
+            const month = document.getElementById('month').value;
+            const year = document.getElementById('year').value;
+            window.location.href = `/admin/api/export-excel?month=${month}&year=${year}`;
+        });
+        
+        document.getElementById('exportCSVBtn').addEventListener('click', () => {
+            const month = document.getElementById('month').value;
+            const year = document.getElementById('year').value;
+            window.location.href = `/admin/api/export-csv?month=${month}&year=${year}`;
+        });
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Load current month/year data
+        loadAttendance(new Date().getMonth() + 1, currentYear);
+    </script>
+</body>
+</html>

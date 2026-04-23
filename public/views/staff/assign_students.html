@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assign Students - Staff Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/staff/dashboard" class="navbar-brand">Attendance System - Staff</a>
+        <ul class="navbar-nav">
+            <li><a href="/staff/dashboard">Dashboard</a></li>
+            <li><a href="/staff/assign_students">Assign Students</a></li>
+            <li><a href="/staff/mark_attendance">Mark Attendance</a></li>
+            <li><a href="/staff/view_attendance">View Attendance</a></li>
+            <li><a href="/logout">Logout</a></li>
+        </ul>
+    </nav>
+    
+    <div class="container">
+        <div class="card">
+            <h2>Assign Students to Subject (Open Elective)</h2>
+            
+            <div id="message"></div>
+            
+            <form id="assignForm">
+                <div class="form-group">
+                    <label for="subject_id">Select Subject</label>
+                    <select class="form-control" id="subject_id" name="subject_id" required>
+                        <option value="">Select a subject</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Select Students</label>
+                    <div id="studentsList" style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
+                        Loading...
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Assign Students</button>
+            </form>
+        </div>
+        
+        <div class="card">
+            <h3>Currently Assigned Students</h3>
+            <div class="table-container">
+                <table id="assignedTable">
+                    <thead>
+                        <tr>
+                            <th>Subject</th>
+                            <th>Roll Number</th>
+                            <th>Student Name</th>
+                            <th>Assigned Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="assignedBody">
+                        <tr><td colspan="4" style="text-align: center;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/js/main.js"></script>
+    <script>
+        let allStudents = [];
+        
+        async function loadSubjects() {
+            const response = await fetch('/staff/api/subjects');
+            const subjects = await response.json();
+            const select = document.getElementById('subject_id');
+            subjects.forEach(s => {
+                const option = document.createElement('option');
+                option.value = s.subject_id;
+                option.textContent = `${s.subject_code} - ${s.subject_name}`;
+                select.appendChild(option);
+            });
+        }
+        
+        async function loadAllStudents() {
+            const response = await fetch('/staff/api/students/all');
+            allStudents = await response.json();
+        }
+        
+        async function loadAssigned() {
+            const response = await fetch('/staff/api/assigned-students');
+            const assignments = await response.json();
+            const tbody = document.getElementById('assignedBody');
+            
+            if (assignments.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No students assigned yet</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = assignments.map(a => `
+                <tr>
+                    <td>${escapeHtml(a.subject_id.subject_code)}</td>
+                    <td>${escapeHtml(a.student_id.roll_number)}</td>
+                    <td>${escapeHtml(a.student_id.student_name)}</td>
+                    <td>${new Date(a.assigned_at).toLocaleDateString()}</td>
+                </tr>
+            `).join('');
+        }
+        
+        function updateStudentsList() {
+            const subjectId = document.getElementById('subject_id').value;
+            const container = document.getElementById('studentsList');
+            
+            if (!subjectId) {
+                container.innerHTML = '<p style="color: #999; text-align: center;">Select a subject first</p>';
+                return;
+            }
+            
+            if (allStudents.length === 0) {
+                container.innerHTML = '<p style="color: #999; text-align: center;">No students found</p>';
+                return;
+            }
+            
+            container.innerHTML = allStudents.map(s => `
+                <div style="margin-bottom: 10px;">
+                    <label>
+                        <input type="checkbox" name="students" value="${s._id}">
+                        ${escapeHtml(s.roll_number)} - ${escapeHtml(s.student_name)}
+                    </label>
+                </div>
+            `).join('');
+        }
+        
+        document.getElementById('subject_id').addEventListener('change', updateStudentsList);
+        
+        document.getElementById('assignForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const subject_id = document.getElementById('subject_id').value;
+            const checkboxes = document.querySelectorAll('input[name="students"]:checked');
+            const students = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (students.length === 0) {
+                showNotification('Please select at least one student!', 'danger');
+                return;
+            }
+            
+            const response = await fetch('/staff/api/assign-students', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subject_id, students })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showNotification(result.message, 'success');
+                loadAssigned();
+                updateStudentsList();
+            } else {
+                showNotification(result.error, 'danger');
+            }
+        });
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        loadSubjects();
+        loadAllStudents();
+        loadAssigned();
+    </script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Dashboard - Attendance Management System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/staff/dashboard" class="navbar-brand">Attendance System - Staff</a>
+        <ul class="navbar-nav">
+            <li><a href="/staff/dashboard">Dashboard</a></li>
+            <li><a href="/staff/assign_students">Assign Students</a></li>
+            <li><a href="/staff/mark_attendance">Mark Attendance</a></li>
+            <li><a href="/staff/view_attendance">View Attendance</a></li>
+            <li><a href="/logout" onclick="return confirm('Are you sure you want to logout?')">Logout</a></li>
+        </ul>
+    </nav>
+    
+    <div class="container">
+        <h1 id="welcomeMsg"></h1>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="subjectCount">-</div>
+                <div class="stat-label">Assigned Subjects</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>Your Subjects</h3>
+            <div id="subjectsList"></div>
+        </div>
+        
+        <div class="card">
+            <h3>Quick Actions</h3>
+            <div style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+                <a href="/staff/mark_attendance" class="btn btn-primary">Mark Attendance</a>
+                <a href="/staff/view_attendance" class="btn btn-success">View Attendance Records</a>
+                <a href="/staff/assign_students" class="btn btn-info">Assign Students to Subjects</a>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/js/main.js"></script>
+    <script>
+        async function loadSubjects() {
+            try {
+                const response = await fetch('/staff/api/subjects');
+                const subjects = await response.json();
+                
+                document.getElementById('subjectCount').textContent = subjects.length;
+                
+                const container = document.getElementById('subjectsList');
+                if (subjects.length === 0) {
+                    container.innerHTML = '<p>No subjects assigned yet. Please contact admin.</p>';
+                } else {
+                    container.innerHTML = '<ul style="margin-top: 20px;">' + 
+                        subjects.map(s => `<li style="padding: 10px; border-bottom: 1px solid #eee;">
+                            <strong>${escapeHtml(s.subject_code)}</strong> - ${escapeHtml(s.subject_name)}
+                        </li>`).join('') + '</ul>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        async function getUserInfo() {
+            try {
+                const response = await fetch('/api/check-session');
+                const data = await response.json();
+                if (data.authenticated) {
+                    document.getElementById('welcomeMsg').innerHTML = `Welcome, ${escapeHtml(data.user.full_name)}!`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        loadSubjects();
+        getUserInfo();
+        
+        setTimeout(function() {
+            alert('Your session will expire in 2 minutes due to inactivity.');
+        }, 1680000);
+    </script>
+</body>
+</html>
