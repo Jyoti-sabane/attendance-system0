@@ -1,5 +1,5 @@
 // API Configuration - CHANGE THIS URL AFTER BACKEND DEPLOYMENT
-const API_BASE_URL = 'http://localhost:3000'; // Will change later
+const API_BASE_URL = 'https://attendance-backend-dbfp.onrender.com'; // Will change later
 
 async function apiCall(endpoint, method = 'GET', data = null) {
     const url = API_BASE_URL + endpoint;
